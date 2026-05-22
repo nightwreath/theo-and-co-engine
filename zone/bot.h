@@ -943,6 +943,11 @@ public:
 	void SetBotStance(uint8 stance_id) { _botStance = Stance::IsValid(stance_id) ? stance_id : Stance::Passive; }
 	uint32 GetSpellRecastTimer(uint16 spell_id = 0);
 	bool CheckSpellRecastTimer(uint16 spell_id = 0);
+	// S39 followup B: true when at least one group member could legitimately
+	// receive this buff (CanBuffStack >= 0). Used to bypass the per-spell
+	// recast cooldown so buff coverage isn't stranded for minutes when one
+	// member drops a buff the rest still have.
+	bool HasGroupMemberMissingBuff(uint16 spell_id);
 	uint32 GetSpellRecastRemainingTime(uint16 spell_id = 0);
 	void SetSpellRecastTimer(uint16 spell_id, int32 recast_delay = 0);
 	uint32 CalcSpellRecastTimer(uint16 spell_id);

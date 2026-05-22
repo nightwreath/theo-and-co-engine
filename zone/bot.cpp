@@ -9424,6 +9424,33 @@ bool Bot::CheckSpellRecastTimer(uint16 spell_id)
 	return false;
 }
 
+// S39 followup B: returns true if at least one group member could
+// legitimately receive this buff (CanBuffStack returns a valid slot index,
+// not -1). Used to bypass CheckSpellRecastTimer for beneficial buffs in the
+// idle loop: without this, dropping a group buff (e.g. Boon of the Garou,
+// recast_time=180s) left a player without coverage for up to the spell's
+// full recast_time even when the bot could safely refresh it. The bot's
+// per-target CanBuffStack check downstream still prevents wasted casts on
+// already-buffed members.
+bool Bot::HasGroupMemberMissingBuff(uint16 spell_id)
+{
+	if (!IsValidSpell(spell_id)) {
+		return false;
+	}
+
+	const auto& target_list = GetSpellTargetList(false);
+	for (Mob* m : target_list) {
+		if (!m || m->IsCorpse()) {
+			continue;
+		}
+		if (m->CanBuffStack(spell_id, GetLevel(), true) >= 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void Bot::SetDisciplineReuseTimer(uint16 spell_id, int32 reuse_timer)
 {
 	if (!IsValidSpell(spell_id)) {
