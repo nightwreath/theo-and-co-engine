@@ -357,13 +357,17 @@ void bot_command_cast(Client* c, const Seperator* sep)
 	Mob* tar = c->GetTarget();
 
 	if (!tar) {
-		if ((!aa_type && !by_spell_id) && spell_type != BotSpellTypes::Escape && spell_type != BotSpellTypes::Pet) {
+		// S39 followup D: `each` mode iterates group/raid members internally
+		// (bot_cast.cpp's Each branch uses c->GetGroup()->members directly),
+		// so the player-target gate is unnecessary -- the Single Speed button
+		// can fire from any context without forcing a manual self-target.
+		if ((!aa_type && !by_spell_id) && spell_type != BotSpellTypes::Escape && spell_type != BotSpellTypes::Pet && sub_target_type != CommandedSubTypes::Each) {
 			c->Message(Chat::Yellow, "You need a target for that.");
 			return;
 		}
 	}
 
-	if (!aa_type && !by_spell_id) {
+	if (!aa_type && !by_spell_id && sub_target_type != CommandedSubTypes::Each) {
 		if (IsPetBotSpellType(spell_type) && !tar->IsPet()) {
 			c->Message(
 				Chat::Yellow,
@@ -455,6 +459,7 @@ void bot_command_cast(Client* c, const Seperator* sep)
 	}
 
 	if (
+		sub_target_type != CommandedSubTypes::Each &&
 		(spell_type == BotSpellTypes::Cure || spell_type == BotSpellTypes::GroupCures || spell_type == BotSpellTypes::PetCures) &&
 		!c->CastToBot()->GetNeedsCured(tar)
 	) {
