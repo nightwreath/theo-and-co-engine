@@ -503,6 +503,73 @@ inline const BotClassHPCalibration* LookupBotClassHPCalibration(uint8_t class_) 
 	return nullptr;
 }
 
+// =========================================================================
+// SYNTHETIC RESISTS (S40 raid rescale) — Bot::CreateDefaultNPCTypeStructForBot
+// hardcodes 25/25/25/15/15 (MR/FR/CR/PR/DR) for every bot regardless of
+// level, class, or gear. CalcBonuses zeroes itembonuses (gear cosmetic),
+// so gear-resist contribution = 0. CalcMR/FR/CR/PR/DR adds engine class
+// flat bonuses (WAR +L/2 MR, RNG +L-49 FR & CR, PAL +L-49 DR, SHD +L-49
+// DR & PR, ROG +L-49 PR; all other classes 0) plus itembonuses + spell +
+// AA bonuses. Net result before this layer: a L65 caster bot has 25 MR
+// unbuffed. PoP-era raid AE nukes assume 100+ resists for any chance of
+// mitigation -- bots ate every cast at full damage.
+//
+// Fix: derive a synthetic "gear-equivalent" resist baseline from class+level,
+// populate itembonuses.MR/FR/CR/PR/DR in CalcBonuses (mirroring the
+// HP/Mana/AC synthetic-gear pattern). CalcMR/FR/CR/PR/DR's existing sum
+// line picks them up automatically -- no further engine plumbing.
+//
+// First-pass scheme (class-uniform; per-class differentiation handled by
+// engine's existing class flat bonuses underneath this layer):
+//   L<20      : 0 (gear contributes nothing per §5.2)
+//   L20..L60  : linear ramp 0 -> 75
+//   L60..L65  : linear ramp 75 -> 100
+//   L>=65     : 100
+//
+// Effective L65 totals after engine class flats:
+//   WAR  : MR 157 (25+L/2+100), FR/CR 125, PR/DR 115
+//   PAL  : MR/FR/CR 125, PR 115, DR 139 (25+24+100)
+//   SHD  : MR/FR/CR 125, PR/DR 135 (15+20+100)
+//   ROG  : MR/FR/CR 125, PR 139 (15+24+100), DR 115
+//   RNG  : MR 125, FR/CR 149 (25+24+100), PR/DR 115
+//   CLR/DRU/SHM/WIZ/MAG/ENC/NEC/BRD/MNK/BST : MR/FR/CR 125, PR/DR 115
+//
+// These are PLACEHOLDER ANCHORS for the raid-rescale work. Tune the L60/L65
+// constants (or convert to a per-class table mirroring kBotClassHPCalibration)
+// once raid retest data lands.
+// =========================================================================
+
+struct BotResistOffsets {
+	int16_t mr;
+	int16_t fr;
+	int16_t cr;
+	int16_t pr;
+	int16_t dr;
+};
+
+inline BotResistOffsets BotComputeResistOffsets(uint8_t /*class_*/, uint8_t level) {
+	BotResistOffsets out{0, 0, 0, 0, 0};
+	if (level < 20) {
+		return out;
+	}
+
+	int v;
+	if (level <= 60) {
+		v = (int)((float)(level - 20) * 75.0f / 40.0f + 0.5f);  // 0 -> 75 across L20..L60
+	} else if (level <= 65) {
+		v = 75 + (int)((float)(level - 60) * 5.0f + 0.5f);       // 75 -> 100 across L60..L65
+	} else {
+		v = 100;
+	}
+
+	out.mr = (int16_t)v;
+	out.fr = (int16_t)v;
+	out.cr = (int16_t)v;
+	out.pr = (int16_t)v;
+	out.dr = (int16_t)v;
+	return out;
+}
+
 // HP offset for a bot at a given level. Returns flat HP to ADD — applied
 // AFTER the AA-percent multiplier in Bot::CalcMaxHP, alongside the existing
 // FlatMaxHPChange terms.

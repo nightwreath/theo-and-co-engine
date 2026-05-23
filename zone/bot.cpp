@@ -6482,6 +6482,19 @@ void Bot::CalcBonuses() {
 		itembonuses.HP   = _cs.hp_bonus;
 		itembonuses.Mana = _cs.mana_bonus;
 		itembonuses.AC   = _cs.ac_bonus;
+		// S40 raid rescale: synthetic resists from the same model. Gear is
+		// cosmetic so itembonuses.MR/FR/CR/PR/DR was stuck at 0, leaving bots
+		// with only the 25/25/25/15/15 NPC default + engine class-flavor flats
+		// (PoP-era raid AEs assume 100+; bots ate every cast). Mirrors the
+		// HP/Mana/AC pattern -- CalcMR/FR/CR/PR/DR's existing sum line below
+		// picks these up automatically. See bot_stat_model.h header for the
+		// curve + per-class effective totals after engine class flats.
+		BotResistOffsets _ro = BotComputeResistOffsets(GetClass(), GetLevel());
+		itembonuses.MR = _ro.mr;
+		itembonuses.FR = _ro.fr;
+		itembonuses.CR = _ro.cr;
+		itembonuses.PR = _ro.pr;
+		itembonuses.DR = _ro.dr;
 #if defined(THEO_GROUPA_STATMODEL_DIAGNOSE) && THEO_GROUPA_STATMODEL_DIAGNOSE
 		LogInfo(
 			"[Theo GroupA stat-model] bot [{}] class [{}] race [{}] level [{}] => "
