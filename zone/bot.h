@@ -955,6 +955,13 @@ public:
 	void SetSpellDuration(int spell_id, int duration = 0, int level = -1, ApplySpellType apply_type = ApplySpellType::Solo, bool allow_pets = false, bool is_raid_group_only = true);
 
 	// "SET" Class Methods
+	// Theo Group A panel: total AA points "spent" -- mirrors the player-facing
+	// aapoints_spent formula in Client::SaveCharacterAlternateAdvancement.
+	// Lives on Bot (not free function) because Mob::aa_ranks is protected;
+	// Bot::* member can access it where bot_inventory.cpp's free function
+	// cannot. Iteration cost is fine for a panel-display path (not hot).
+	uint32 ComputeTotalAAPoints();
+
 	void SetBotSpellID(uint32 newSpellID);
 	void SetSpawnStatus(bool spawnStatus) { _spawnStatus = spawnStatus; }
 	void SetPetChooserID(uint8 id) { _petChooserID = id; }
