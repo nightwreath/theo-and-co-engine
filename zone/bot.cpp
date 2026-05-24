@@ -6482,6 +6482,19 @@ void Bot::CalcBonuses() {
 		itembonuses.HP   = _cs.hp_bonus;
 		itembonuses.Mana = _cs.mana_bonus;
 		itembonuses.AC   = _cs.ac_bonus;
+		// Synthetic resists -- closes the Group A gap where gear-equivalent
+		// resists weren't being backfilled. Curve anchored on classic-thru-PoP
+		// raid resist data (research S40 2026-05-22, Alex-approved). See the
+		// BotComputeResistOffsets header in bot_stat_model.h for the curve
+		// shape + per-class effective totals. CalcMR/FR/CR/PR/DR's existing
+		// `itembonuses.XX + spellbonuses.XX + aabonuses.XX` sum line picks
+		// these up automatically -- no further engine plumbing needed.
+		BotResistOffsets _ro = BotComputeResistOffsets(GetClass(), GetLevel());
+		itembonuses.MR = _ro.mr;
+		itembonuses.FR = _ro.fr;
+		itembonuses.CR = _ro.cr;
+		itembonuses.PR = _ro.pr;
+		itembonuses.DR = _ro.dr;
 #if defined(THEO_GROUPA_STATMODEL_DIAGNOSE) && THEO_GROUPA_STATMODEL_DIAGNOSE
 		LogInfo(
 			"[Theo GroupA stat-model] bot [{}] class [{}] race [{}] level [{}] => "
