@@ -8734,6 +8734,27 @@ void Bot::RefreshOwnerRegenMult() {
 // beyond. The real-level clamp is the locked safety guarantee: a modest
 // pre-51 bank cannot dump the full endgame AA set at 51 — the cap holds it
 // to the level-51-eligible pool until the bot actually levels past 51.
+// Theo Group A panel: total AA points "spent" -- mirrors the player-facing
+// formula in Client::SaveCharacterAlternateAdvancement (client.cpp:933-960):
+// for each rank in aa_ranks, look up the AA's rank-by-points-spent and sum
+// total_cost. Lives on Bot so it can access the protected Mob::aa_ranks.
+uint32 Bot::ComputeTotalAAPoints() {
+	uint32 total = 0;
+	for (auto& rank : aa_ranks) {
+		auto aa = zone->GetAlternateAdvancementAbility(rank.first);
+		if (!aa) {
+			continue;
+		}
+		if (rank.second.first > 0) {
+			auto r = aa->GetRankByPointsSpent(rank.second.first);
+			if (r) {
+				total += r->total_cost;
+			}
+		}
+	}
+	return total;
+}
+
 int Bot::GetEarnedAALevel() {
 	if (GetLevel() < 51) {
 		// Every aa_ranks.level_req >= 0; (level_req > -1) is true for ALL

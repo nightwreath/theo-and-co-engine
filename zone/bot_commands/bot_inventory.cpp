@@ -480,6 +480,17 @@ void bot_command_stats_window(Client* c, const Seperator* sep)
 	row("AC bonus (AC)",       fmt::format("{}  ({})", s.ac_bonus,   my_bot->GetAC()));
 	row("Drill dmg_out / dmg_in", fmt::format("x{:.2f} / x{:.2f}",
 		my_bot->GetOwnerDrillMult("dmg_out_mult"), my_bot->GetOwnerDrillMult("dmg_in_mult")));
+	// Resists -- live effective values after race base + class flat (engine
+	// CalcMR/FR/CR/PR/DR) + synthetic gear backfill (PR #30) + any active
+	// buffs / AA bonuses. Use the Get accessors so we see the real value
+	// the engine uses in spell-resist rolls, not the individual layers.
+	row("Resists MR/FR/CR/PR/DR", fmt::format("{} / {} / {} / {} / {}",
+		my_bot->GetMR(), my_bot->GetFR(), my_bot->GetCR(),
+		my_bot->GetPR(), my_bot->GetDR()));
+	// AA total earned -- delegated to Bot::ComputeTotalAAPoints (mirrors the
+	// player-facing aapoints_spent formula). Lives on Bot because
+	// Mob::aa_ranks is protected; this free function can't iterate it directly.
+	row("AA earned", fmt::format("{}", my_bot->ComputeTotalAAPoints()));
 	t.append("</table>");
 
 	c->SendPopupToClient(title.c_str(), t.c_str());
