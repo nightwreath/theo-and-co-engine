@@ -480,6 +480,31 @@ void bot_command_stats_window(Client* c, const Seperator* sep)
 	row("AC bonus (AC)",       fmt::format("{}  ({})", s.ac_bonus,   my_bot->GetAC()));
 	row("Drill dmg_out / dmg_in", fmt::format("x{:.2f} / x{:.2f}",
 		my_bot->GetOwnerDrillMult("dmg_out_mult"), my_bot->GetOwnerDrillMult("dmg_in_mult")));
+	// Resists -- live effective values after race base + class flat (engine
+	// CalcMR/FR/CR/PR/DR) + synthetic gear backfill (PR #30) + any active
+	// buffs / AA bonuses. Use the Get accessors so we see the real value
+	// the engine uses in spell-resist rolls, not the individual layers.
+	row("Resists MR/FR/CR/PR/DR", fmt::format("{} / {} / {} / {} / {}",
+		my_bot->GetMR(), my_bot->GetFR(), my_bot->GetCR(),
+		my_bot->GetPR(), my_bot->GetDR()));
+	// AA total earned -- mirrors the player-facing aapoints_spent formula
+	// from Client::SaveCharacterAlternateAdvancement (client.cpp:933-960):
+	// for each rank in aa_ranks, look up the AA's rank-by-points-spent and
+	// sum total_cost. Same number players see on their own AA window.
+	uint32 bot_aa_points = 0;
+	for (auto& rank : my_bot->aa_ranks) {
+		auto aa = zone->GetAlternateAdvancementAbility(rank.first);
+		if (!aa) {
+			continue;
+		}
+		if (rank.second.first > 0) {
+			auto r = aa->GetRankByPointsSpent(rank.second.first);
+			if (r) {
+				bot_aa_points += r->total_cost;
+			}
+		}
+	}
+	row("AA earned", fmt::format("{}", bot_aa_points));
 	t.append("</table>");
 
 	c->SendPopupToClient(title.c_str(), t.c_str());
