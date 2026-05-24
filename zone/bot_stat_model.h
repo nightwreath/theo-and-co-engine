@@ -503,6 +503,98 @@ inline const BotClassHPCalibration* LookupBotClassHPCalibration(uint8_t class_) 
 	return nullptr;
 }
 
+// =========================================================================
+// SYNTHETIC RESISTS — Bot::CreateDefaultNPCTypeStructForBot hardcodes
+// 25/25/25/15/15 (MR/FR/CR/PR/DR) for every bot, matching the L1 race-base
+// resist a real player has (see Client::CalcMR in client_mods.cpp:1054 --
+// race base 25 with minor +5 boosts for Erudite/Dwarf/Iksar/etc, plus the
+// class flat bonuses also mirrored in Bot::CalcMR -- WAR +L/2 MR,
+// RNG +L-49 FR&CR, PAL +L-49 DR, SHD +L-49 DR&PR, ROG +L-49 PR).
+//
+// The GAP: real players accumulate `itembonuses.MR/FR/CR/PR/DR` from their
+// equipped gear. Group A makes bot gear cosmetic and zeroes itembonuses,
+// so bots got no gear-derived resists. A L65 cleric bot ran with 25 MR
+// unbuffed -- PoP-era raid AE nukes assume 100+ resists.
+//
+// This curve is the "gear-equivalent" resist contribution by level,
+// anchored on classic-era raid resist data (Project 1999 wiki + EQEmu
+// community + EQProgression guides), class-uniform across all 5 schools
+// (engine class flats above handle PAL+DR, RNG+FR&CR, etc. school-specific
+// flavor). Curve shape designed S40 (2026-05-22) with Alex sign-off:
+//
+//   L<20      : 0       (creation-base only -- match Group A "no gear <20")
+//   L20..L50  : 5 -> 50  linear (Classic-era slow ramp; gear barely had
+//                                resists pre-Velious -- classic raid tank
+//                                hit ~100 MR effective at L50)
+//   L51       : 80      SPIKE (Velious AAs unlock at L51 + first Velious
+//                                resist gear drops -- the well-attested
+//                                Kunark->Velious resist-meta inflection)
+//   L51..L60  : 80 -> 150 linear (Velious resist-gear era; raid tank
+//                                  reached 200-250 MR effective with
+//                                  resist-stacking)
+//   L60..L65  : 150 -> 250 linear (Luclin/PoP raid-tier; Time/Quarm/Bertox
+//                                   tanks pushed 250-307 MR effective)
+//   L>=65     : 250 clamp
+//
+// Effective L65 totals (race 25/15 + engine class flat + this synthetic 250):
+//   WAR : MR 307 (engine +L/2), FR/CR 275, PR/DR 265
+//   PAL : MR/FR/CR 275, PR 265, DR 289 (engine +L-49)
+//   SHD : MR/FR/CR 275, PR/DR 285 (engine +L-49)
+//   ROG : MR/FR/CR 275, PR 289 (engine +L-49), DR 265
+//   RNG : MR 275, FR/CR 299 (engine +L-49), PR/DR 265
+//   CLR/DRU/SHM/WIZ/MAG/ENC/NEC/BRD/MNK/BST : MR/FR/CR 275, PR/DR 265
+//
+// Slightly above hardcore PoP-Time players (real-world top ~250-275 MR
+// unbuffed) -- intentional, since project intent is "1 player + 5 bots
+// can do PoP-era group/raid content" and bots have an AI gap to close.
+//
+// Tune by adjusting the four anchor constants (L20_offset, L50_offset,
+// L51_offset, L60_offset, L65_offset) once raid retest data lands.
+// =========================================================================
+
+struct BotResistOffsets {
+	int16_t mr;
+	int16_t fr;
+	int16_t cr;
+	int16_t pr;
+	int16_t dr;
+};
+
+inline BotResistOffsets BotComputeResistOffsets(uint8_t /*class_*/, uint8_t level) {
+	BotResistOffsets out{0, 0, 0, 0, 0};
+
+	int v;
+	if (level < 20) {
+		v = 0;
+	}
+	else if (level <= 50) {
+		// Classic-era slow ramp 5 -> 50 across L20..L50
+		v = (int)(5.0f + (float)(level - 20) * 45.0f / 30.0f + 0.5f);
+	}
+	else if (level <= 60) {
+		// Velious-era spike + resist-gear meta: 80 -> 150 across L51..L60
+		// (one-level discontinuity from 50 at L50 to 80 at L51 = the
+		//  attested gear-unlock inflection)
+		v = (int)(80.0f + (float)(level - 51) * 70.0f / 9.0f + 0.5f);
+	}
+	else if (level <= 65) {
+		// Luclin/PoP raid-tier: 150 -> 250 across L60..L65 (+20/level)
+		v = 150 + (level - 60) * 20;
+	}
+	else {
+		// server level cap is 65; clamp defensively for any over-cap case
+		v = 250;
+	}
+
+	int16_t v16 = (int16_t)v;
+	out.mr = v16;
+	out.fr = v16;
+	out.cr = v16;
+	out.pr = v16;
+	out.dr = v16;
+	return out;
+}
+
 // HP offset for a bot at a given level. Returns flat HP to ADD — applied
 // AFTER the AA-percent multiplier in Bot::CalcMaxHP, alongside the existing
 // FlatMaxHPChange terms.
