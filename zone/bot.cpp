@@ -22,6 +22,7 @@
 #include "common/data_verification.h"
 #include "common/repositories/bot_inventories_repository.h"
 #include "common/repositories/bot_spell_settings_repository.h"
+#include "common/repositories/bot_spells_entries_repository.h" // Theo-and-Co S47: Bot::LoadPet defensive class-check
 #include "common/repositories/bot_starting_items_repository.h"
 #include "common/repositories/criteria/content_filter_criteria.h"
 #include "common/skill_caps.h"
@@ -1564,6 +1565,50 @@ bool Bot::LoadPet()
 
 	if (!IsValidSpell(saved_pet_spell_id)) {
 		bot_owner->Message(Chat::White, "Invalid spell id for %s's pet", GetCleanName());
+		DeletePet();
+		return false;
+	}
+
+	// Defensive class-check: confirm the saved spell is in this bot's
+	// class spell list (npc_spells_id = 3000 + class) before re-summoning.
+	//
+	// Cross-class data lands in bot_pets when MySQL auto-increment reuses
+	// a bot_id from a previously-deleted bot whose auxiliary rows weren't
+	// cleaned (the historical `Bots:BotSoftDeletes=true` engine default
+	// gates the bot_pets/bot_inventories/bot_buffs/bot_stances cleanup
+	// chain below in `Bot::DeleteBot`, so soft-deleted bots leave their
+	// pet behind and the next bot at that bot_id inherits it).
+	//
+	// Without this guard, LoadPet faithfully re-summons whatever spell is
+	// saved -- a Mage bot at a reused Necromancer bot_id spawns with a
+	// Necro pet on every camp/respawn, and `Bot::BotCastPet`'s `HasPet()`
+	// short-circuit then prevents the bot from ever summoning its real
+	// pet. Discard the row instead, and the next combat cycle's
+	// `BotCastPet` selects the correct class-appropriate pet.
+	//
+	// Companion repo-side fix in `sql/109_bot_per_table_orphan_and_cross_class_cleanup.sql`
+	// flips `Bots:BotSoftDeletes` to false and scrubs existing orphans.
+	// This guard is the engine-side defense-in-depth for any future
+	// contamination path.
+	const auto class_spell_check = BotSpellsEntriesRepository::GetWhere(
+		content_db,
+		fmt::format(
+			"npc_spells_id = {} AND spell_id = {} LIMIT 1",
+			GetBotSpellID(),
+			saved_pet_spell_id
+		)
+	);
+	if (class_spell_check.empty()) {
+		bot_owner->Message(
+			Chat::Yellow,
+			fmt::format(
+				"{} says, 'Discarding a saved pet not in my class spell list "
+				"(spell id {}) -- likely leftover from another bot at this id. "
+				"I'll re-summon correctly on next combat.'",
+				GetCleanName(),
+				saved_pet_spell_id
+			).c_str()
+		);
 		DeletePet();
 		return false;
 	}
@@ -5781,6 +5826,58 @@ bool Bot::IsBotAttackAllowed(Mob* attacker, Mob* target, bool& hasRuleDefined) {
 
 void Bot::EquipBot() {
 	GetBotItems(m_inv);
+
+	// Defensive class-check: discard any equipped item the bot's class
+	// cannot use (per `items.classes` bitmask). Cross-class gear lands in
+	// bot_inventories the same way cross-class pets land in bot_pets --
+	// MySQL auto-increment reuses a bot_id from a previously-deleted bot
+	// whose auxiliary rows weren't cleaned (the historical
+	// `Bots:BotSoftDeletes=true` engine default gates the cleanup chain
+	// in `Bot::DeleteBot`). The new bot at that bot_id inherits the old
+	// bot's full inventory, then EquipBot's "player gear wins" logic
+	// treats those leftovers as legitimate and never re-equips correct
+	// cosmetic gear. Symptom observed S47-parallel: Mage bot "Toad"
+	// spawning with Necromancer scythe + Flowing Black Robe, "SK with a
+	// staff", etc. Companion repo-side fix in `sql/109_...` flips
+	// BotSoftDeletes to false and scrubs existing orphans; this guard
+	// is the engine-side defense-in-depth.
+	//
+	// `RemoveBotItemBySlot` (bot.cpp:3801) both deletes the bot_inventories
+	// row and clears the in-memory `m_inv` slot, so the cosmetic-fill loop
+	// below sees the slot as empty and re-equips correctly per spec.
+	for (int slot_id = EQ::invslot::EQUIPMENT_BEGIN;
+	     slot_id <= EQ::invslot::EQUIPMENT_END;
+	     ++slot_id) {
+		const EQ::ItemInstance* check_inst = GetBotItem(slot_id);
+		if (!check_inst) {
+			continue;
+		}
+		const EQ::ItemData* check_item = check_inst->GetItem();
+		if (!check_item) {
+			continue;
+		}
+		const uint8 bot_class = GetClass();
+		if (bot_class == 0 || bot_class > 16) {
+			continue;
+		}
+		const uint32 class_bit = 1u << (bot_class - 1);
+		if ((check_item->Classes & class_bit) == 0) {
+			auto bot_owner = GetBotOwner();
+			if (bot_owner) {
+				bot_owner->Message(
+					Chat::Yellow,
+					fmt::format(
+						"{} says, 'Discarding item [{}] (id {}) -- my class cannot equip it. "
+						"Likely leftover from another bot at this id. I'll re-equip correctly.'",
+						GetCleanName(),
+						check_item->Name,
+						check_item->ID
+					).c_str()
+				);
+			}
+			RemoveBotItemBySlot(slot_id);
+		}
+	}
 
 	// Theo-and-Co Phase 3 Group A: cosmetic class starter gear. Fill ONLY
 	// empty equipment slots via the NATIVE persisted path (AddBotItem ->
