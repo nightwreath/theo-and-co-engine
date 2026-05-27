@@ -2397,9 +2397,19 @@ uint16 Lua_Client::ScribeSpells(uint8 min_level, uint8 max_level) {
 	return self->ScribeSpells(min_level, max_level);
 }
 
+uint16 Lua_Client::ScribeSpells(uint8 min_level, uint8 max_level, bool silent) {
+	Lua_Safe_Call_Int();
+	return self->ScribeSpells(min_level, max_level, silent);
+}
+
 uint16 Lua_Client::LearnDisciplines(uint8 min_level, uint8 max_level) {
 	Lua_Safe_Call_Int();
 	return self->LearnDisciplines(min_level, max_level);
+}
+
+uint16 Lua_Client::LearnDisciplines(uint8 min_level, uint8 max_level, bool silent) {
+	Lua_Safe_Call_Int();
+	return self->LearnDisciplines(min_level, max_level, silent);
 }
 
 int Lua_Client::GetNextAvailableDisciplineSlot() {
@@ -3977,6 +3987,7 @@ luabind::scope lua_register_client() {
 	.def("KeyRingRemove", (bool(Lua_Client::*)(uint32))&Lua_Client::KeyRingRemove)
 	.def("Kick", (void(Lua_Client::*)(void))&Lua_Client::Kick)
 	.def("LearnDisciplines", (uint16(Lua_Client::*)(uint8,uint8))&Lua_Client::LearnDisciplines)
+	.def("LearnDisciplines", (uint16(Lua_Client::*)(uint8,uint8,bool))&Lua_Client::LearnDisciplines)
 	.def("LearnRecipe", (void(Lua_Client::*)(uint32))&Lua_Client::LearnRecipe)
 	.def("LeaveGroup", (void(Lua_Client::*)(void))&Lua_Client::LeaveGroup)
 	.def("LoadPEQZoneFlags", (void(Lua_Client::*)(void))&Lua_Client::LoadPEQZoneFlags)
@@ -4076,6 +4087,7 @@ luabind::scope lua_register_client() {
 	.def("ScribeSpell", (void(Lua_Client::*)(int,int))&Lua_Client::ScribeSpell)
 	.def("ScribeSpell", (void(Lua_Client::*)(int,int,bool))&Lua_Client::ScribeSpell)
 	.def("ScribeSpells", (uint16(Lua_Client::*)(uint8,uint8))&Lua_Client::ScribeSpells)
+	.def("ScribeSpells", (uint16(Lua_Client::*)(uint8,uint8,bool))&Lua_Client::ScribeSpells)
 	.def("SendColoredText", (void(Lua_Client::*)(uint32, std::string))&Lua_Client::SendColoredText)
 	.def("SendItemScale", (void(Lua_Client::*)(Lua_ItemInst))&Lua_Client::SendItemScale)
 	.def("SendGMCommand", (bool(Lua_Client::*)(std::string))&Lua_Client::SendGMCommand)

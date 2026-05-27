@@ -11600,7 +11600,7 @@ void Client::SaveDisciplines()
 	}
 }
 
-uint16 Client::ScribeSpells(uint8 min_level, uint8 max_level)
+uint16 Client::ScribeSpells(uint8 min_level, uint8 max_level, bool silent)
 {
 	auto             available_book_slot = GetNextAvailableSpellBookSlot();
 	std::vector<int> spell_ids           = GetScribeableSpells(min_level, max_level);
@@ -11609,6 +11609,9 @@ uint16 Client::ScribeSpells(uint8 min_level, uint8 max_level)
 	if (!spell_ids.empty()) {
 		for (const auto& spell_id : spell_ids) {
 			if (available_book_slot == -1) {
+				// "spell book full" is an error condition the player must
+				// see; not gated by `silent` (which only suppresses the
+				// success-summary line).
 				Message(
 					Chat::Red,
 					fmt::format(
@@ -11632,12 +11635,14 @@ uint16 Client::ScribeSpells(uint8 min_level, uint8 max_level)
 	}
 
 	if (scribed_spells > 0) {
-		std::string spell_message = (
-			scribed_spells == 1 ?
-			"a new spell" :
-			fmt::format("{} new spells", scribed_spells)
-		);
-		Message(Chat::White, fmt::format("You have learned {}!", spell_message).c_str());
+		if (!silent) {
+			std::string spell_message = (
+				scribed_spells == 1 ?
+				"a new spell" :
+				fmt::format("{} new spells", scribed_spells)
+			);
+			Message(Chat::White, fmt::format("You have learned {}!", spell_message).c_str());
+		}
 
 		// bulk insert spells
 		SaveSpells();
@@ -11645,7 +11650,7 @@ uint16 Client::ScribeSpells(uint8 min_level, uint8 max_level)
 	return scribed_spells;
 }
 
-uint16 Client::LearnDisciplines(uint8 min_level, uint8 max_level)
+uint16 Client::LearnDisciplines(uint8 min_level, uint8 max_level, bool silent)
 {
 	auto             available_discipline_slot = GetNextAvailableDisciplineSlot();
 	auto             character_id              = CharacterID();
@@ -11655,6 +11660,8 @@ uint16 Client::LearnDisciplines(uint8 min_level, uint8 max_level)
 	if (!spell_ids.empty()) {
 		for (const auto& spell_id : spell_ids) {
 			if (available_discipline_slot == -1) {
+				// "discipline slots full" is an error the player must see;
+				// not gated by `silent`.
 				Message(
 					Chat::Red,
 					fmt::format(
@@ -11677,12 +11684,14 @@ uint16 Client::LearnDisciplines(uint8 min_level, uint8 max_level)
 	}
 
 	if (learned_disciplines > 0) {
-		std::string discipline_message = (
-			learned_disciplines == 1 ?
-			"a new discipline" :
-			fmt::format("{} new disciplines", learned_disciplines)
-		);
-		Message(Chat::White, fmt::format("You have learned {}!", discipline_message).c_str());
+		if (!silent) {
+			std::string discipline_message = (
+				learned_disciplines == 1 ?
+				"a new discipline" :
+				fmt::format("{} new disciplines", learned_disciplines)
+			);
+			Message(Chat::White, fmt::format("You have learned {}!", discipline_message).c_str());
+		}
 		SendDisciplineUpdate();
 		SaveDisciplines();
 	}

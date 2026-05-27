@@ -2328,9 +2328,19 @@ int Perl_Client_ScribeSpells(Client* self, uint8 min_level, uint8 max_level) // 
 	return self->ScribeSpells(min_level, max_level);
 }
 
+int Perl_Client_ScribeSpells(Client* self, uint8 min_level, uint8 max_level, bool silent) // @categories Spells and Disciplines
+{
+	return self->ScribeSpells(min_level, max_level, silent);
+}
+
 int Perl_Client_LearnDisciplines(Client* self, uint8 min_level, uint8 max_level) // @categories Spells and Disciplines
 {
 	return self->LearnDisciplines(min_level, max_level);
+}
+
+int Perl_Client_LearnDisciplines(Client* self, uint8 min_level, uint8 max_level, bool silent) // @categories Spells and Disciplines
+{
+	return self->LearnDisciplines(min_level, max_level, silent);
 }
 
 void Perl_Client_ResetCastbarCooldownBySlot(Client* self, int slot)
@@ -3713,7 +3723,8 @@ void perl_register_client()
 	package.add("KeyRingList", (void(*)(Client*, Client*))&Perl_Client_KeyRingList);
 	package.add("KeyRingRemove", &Perl_Client_KeyRingRemove);
 	package.add("Kick", &Perl_Client_Kick);
-	package.add("LearnDisciplines", &Perl_Client_LearnDisciplines);
+	package.add("LearnDisciplines", (int(*)(Client*, uint8, uint8))&Perl_Client_LearnDisciplines);
+	package.add("LearnDisciplines", (int(*)(Client*, uint8, uint8, bool))&Perl_Client_LearnDisciplines);
 	package.add("LearnRecipe", &Perl_Client_LearnRecipe);
 	package.add("LeaveGroup", &Perl_Client_LeaveGroup);
 	package.add("LoadPEQZoneFlags", &Perl_Client_LoadPEQZoneFlags);
@@ -3806,7 +3817,8 @@ void perl_register_client()
 	package.add("Save", &Perl_Client_Save);
 	package.add("ScribeSpell", (void(*)(Client*, uint16, int))&Perl_Client_ScribeSpell);
 	package.add("ScribeSpell", (void(*)(Client*, uint16, int, bool))&Perl_Client_ScribeSpell);
-	package.add("ScribeSpells", &Perl_Client_ScribeSpells);
+	package.add("ScribeSpells", (int(*)(Client*, uint8, uint8))&Perl_Client_ScribeSpells);
+	package.add("ScribeSpells", (int(*)(Client*, uint8, uint8, bool))&Perl_Client_ScribeSpells);
 	package.add("SendColoredText", &Perl_Client_SendColoredText);
 	package.add("SendGMCommand", (bool(*)(Client*, std::string))&Perl_Client_SendGMCommand);
 	package.add("SendGMCommand", (bool(*)(Client*, std::string, bool))&Perl_Client_SendGMCommand);

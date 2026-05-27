@@ -228,6 +228,7 @@ public:
 	void ScribeSpell(int spell_id, int slot);
 	void ScribeSpell(int spell_id, int slot, bool update_client);
 	uint16 ScribeSpells(uint8 min_level, uint8 max_level);
+	uint16 ScribeSpells(uint8 min_level, uint8 max_level, bool silent);
 	void UnscribeSpell(int slot);
 	void UnscribeSpell(int slot, bool update_client);
 	void UnscribeSpellAll();
@@ -236,6 +237,7 @@ public:
 	void UnscribeSpellBySpellID(uint16 spell_id, bool update_client);
 	void TrainDisc(int itemid);
 	uint16 LearnDisciplines(uint8 min_level, uint8 max_level);
+	uint16 LearnDisciplines(uint8 min_level, uint8 max_level, bool silent);
 	void TrainDiscBySpellID(int32 spell_id);
 	int GetDiscSlotBySpellID(int32 spell_id);
 	void UntrainDisc(int slot);
