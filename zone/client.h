@@ -974,8 +974,11 @@ public:
 	void SaveDisciplines();
 
 	// Bulk Scribe/Learn
-	uint16 ScribeSpells(uint8 min_level, uint8 max_level);
-	uint16 LearnDisciplines(uint8 min_level, uint8 max_level);
+	// silent=true suppresses the "You have learned N new spells/disciplines!" chat
+	// summary so the caller can render its own surface (e.g. an eq.popup with names).
+	// Per-spell/per-disc state changes still send the normal client update.
+	uint16 ScribeSpells(uint8 min_level, uint8 max_level, bool silent = false);
+	uint16 LearnDisciplines(uint8 min_level, uint8 max_level, bool silent = false);
 
 	// Configurable Tracking Skill
 	uint16 GetClassTrackingDistanceMultiplier(uint16 class_);
