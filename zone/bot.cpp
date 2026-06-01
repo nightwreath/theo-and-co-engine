@@ -13969,6 +13969,7 @@ uint16 Bot::GetDefaultSpellTypeDelay(uint16 spell_type, uint8 stance) {
 				case Stance::Burn:
 					return 100;
 				case Stance::Aggressive:
+				case Stance::Vanguard:
 					return 2000;
 				case Stance::Efficient:
 					return 8000;
@@ -13992,6 +13993,7 @@ uint16 Bot::GetDefaultSpellTypeDelay(uint16 spell_type, uint8 stance) {
 				case Stance::Burn:
 					return 100;
 				case Stance::Aggressive:
+				case Stance::Vanguard:
 					return 3000;
 				case Stance::Efficient:
 					return 10000;
@@ -14021,6 +14023,7 @@ uint8 Bot::GetDefaultSpellTypeMinThreshold(uint16 spell_type, uint8 stance) {
 				case Stance::AEBurn:
 				case Stance::Burn:
 				case Stance::Aggressive:
+				case Stance::Vanguard:
 					return 0;
 				default:
 					return 20;
@@ -14033,6 +14036,7 @@ uint8 Bot::GetDefaultSpellTypeMinThreshold(uint16 spell_type, uint8 stance) {
 				case Stance::AEBurn:
 				case Stance::Burn:
 				case Stance::Aggressive:
+				case Stance::Vanguard:
 					return 0;
 				default:
 					return 5;
@@ -14043,6 +14047,7 @@ uint8 Bot::GetDefaultSpellTypeMinThreshold(uint16 spell_type, uint8 stance) {
 				case Stance::AEBurn:
 				case Stance::Burn:
 				case Stance::Aggressive:
+				case Stance::Vanguard:
 					return 0;
 				case Stance::Efficient:
 					return 40;
@@ -14166,6 +14171,7 @@ uint8 Bot::GetDefaultSpellTypeMaxThreshold(uint16 spell_type, uint8 stance) {
 				case Stance::Burn:
 					return 100;
 				case Stance::Aggressive:
+				case Stance::Vanguard:
 					return 100;
 				case Stance::Efficient:
 					return 90;
@@ -14423,6 +14429,7 @@ bool Bot::IsValidBotStance(uint8 stance) {
 		case Stance::Assist:
 		case Stance::Burn:
 		case Stance::AEBurn:
+		case Stance::Vanguard:
 			return true;
 		default:
 			return false;
