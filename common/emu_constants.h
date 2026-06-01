@@ -730,6 +730,7 @@ namespace Stance {
 	constexpr uint32 Burn       = 7;
 	constexpr uint32 Efficient2 = 8;
 	constexpr uint32 AEBurn     = 9;
+	constexpr uint32 Vanguard   = 10; // Theo-and-Co: Aggressive offense + Balanced heals (single-cleric group burn)
 
 	std::string GetName(uint8 stance_id);
 	uint8 GetIndex(uint8 stance_id);
@@ -746,7 +747,8 @@ static std::map<uint32, std::string> stance_names = {
 	{ Stance::Assist,     "Assist" },
 	{ Stance::Burn,       "Burn" },
 	{ Stance::Efficient2, "Efficient" },
-	{ Stance::AEBurn,     "AE Burn" }
+	{ Stance::AEBurn,     "AE Burn" },
+	{ Stance::Vanguard,   "Vanguard" }
 };
 
 namespace LDoNTheme {

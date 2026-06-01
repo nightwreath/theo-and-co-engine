@@ -1103,7 +1103,7 @@ void bot_command_stance(Client *c, const Seperator *sep)
 			"<br>",
 			"Available stances:",
 			fmt::format(
-				"{} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{})",
+				"{} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{}), {} (#{})",
 				Stance::GetName(Stance::Passive),
 				Stance::Passive,
 				Stance::GetName(Stance::Balanced),
@@ -1117,7 +1117,9 @@ void bot_command_stance(Client *c, const Seperator *sep)
 				Stance::GetName(Stance::Burn),
 				Stance::Burn,
 				Stance::GetName(Stance::AEBurn),
-				Stance::AEBurn
+				Stance::AEBurn,
+				Stance::GetName(Stance::Vanguard),
+				Stance::Vanguard
 			),
 			"<br>",
 			fmt::format(
@@ -1154,6 +1156,11 @@ void bot_command_stance(Client *c, const Seperator *sep)
 				"- {} (#{}) - Murder EVERYTHING. Doesn't care about aggro, casts AEs. Everything must die ASAP.",
 				Stance::GetName(Stance::AEBurn),
 				Stance::AEBurn
+			),
+			fmt::format(
+				"- {} (#{}) - Aggressive offense (DPS, debuffs, slows) while healers keep healing on Balanced thresholds. Built for a single-cleric group burn.",
+				Stance::GetName(Stance::Vanguard),
+				Stance::Vanguard
 			)
 		};
 		p.example_format =
