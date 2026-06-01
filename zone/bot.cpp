@@ -1937,7 +1937,8 @@ bool Bot::BotRangedAttack(Mob* other, bool can_double_attack) {
 			(
 				GetBotStance() != Stance::Aggressive &&
 				GetBotStance() != Stance::Burn &&
-				GetBotStance() != Stance::AEBurn
+				GetBotStance() != Stance::AEBurn &&
+				GetBotStance() != Stance::Vanguard
 			) &&
 			other->GetHPRatio() > 99.0f
 		)
@@ -11731,6 +11732,7 @@ bool Bot::GetDefaultSpellTypeHold(uint16 spell_type, uint8 stance) {
 			if (bot_class == Class::ShadowKnight || bot_class == Class::Paladin) {
 				switch (stance) {
 					case Stance::Aggressive:
+					case Stance::Vanguard:
 						return false;
 					default:
 						return true;
@@ -11994,6 +11996,7 @@ bool Bot::GetDefaultSpellTypeAggroCheck(uint16 spell_type, uint8 stance) {
 		case Stance::AEBurn:
 		case Stance::Burn:
 		case Stance::Aggressive:
+		case Stance::Vanguard:
 			return false;
 		default:
 			break;
