@@ -9069,14 +9069,17 @@ void Bot::ListBotSpells(uint8 min_level)
 				}
 			}
 
-			// Zeal "[Add Button]" (Theo-and-Co S56): a custom-encoded clickable link
-			// the Theo/Zeal client intercepts CLIENT-SIDE (OP_ItemLinkClick; it never
-			// reaches the server) to auto-create a hotbar social that force-casts THIS
-			// spell via THIS bot. item_id == SAYLINK_ITEM_ID makes the client emit the
-			// click packet; the payload rides the augments (augments[2]=spell id,
-			// augments[3]=bot entity id, augments[4]=Zeal marker 0xADDCA). A non-Zeal
-			// client that clicks it just gets a harmless "say link not found"
-			// (augments[0/1]=0). Decoder + marker live in Zeal-RoF2 bot_cast_button.cpp.
+			// Zeal "[Add Button]" (Theo-and-Co S56; server-signal redesign S57): a
+			// custom-encoded clickable link. The click DOES reach the server as an
+			// OP_ItemLinkClick -- Handle_OP_ItemLinkClick (client_packet.cpp) detects
+			// the marker and replies with a confirmation line that the Theo/Zeal
+			// client detours dsp_chat to parse + suppress, auto-creating a hotbar
+			// social that force-casts THIS spell via THIS bot. item_id ==
+			// SAYLINK_ITEM_ID makes the client emit the click packet; the payload
+			// rides the augments (augments[2]=spell id, augments[3]=bot entity id,
+			// augments[4]=Zeal marker 0xADDCA). A non-Zeal client just sees the
+			// harmless confirmation line. Decoder lives in Zeal-RoF2
+			// bot_cast_button.cpp.
 			EQ::SayLinkEngine z_add_button;
 			z_add_button.SetProxyItemID(SAYLINK_ITEM_ID);
 			z_add_button.SetProxyAugment3ID(s.spellid);  // -> wire augments[2]

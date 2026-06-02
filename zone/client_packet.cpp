@@ -9127,6 +9127,41 @@ void Client::Handle_OP_ItemLinkClick(const EQApplicationPacket *app)
 			Message(Chat::Red, "Error: The item for the link you have clicked on does not exist!");
 			return;
 		}
+
+		// Theo-and-Co S57: [Add Button] bot cast-social signal.
+		// Bot::ListBotSpells emits a clickable link with augments[4]==0xADDCA,
+		// augments[2]=spell id, augments[3]=bot entity id. Clicking it lands here.
+		// We reply with a human-readable confirmation line that the Theo/Zeal
+		// client detours dsp_chat to parse + suppress, auto-creating a hotbar
+		// social that runs "^cast spellid <id> byname <bot>". Stable parse anchors
+		// (decoder in Zeal-RoF2 bot_cast_button.cpp):
+		//   "Bot cast button ready: [<CLS>] <SpellName> via <BotName> (id <spellid>)"
+		// If the player is on a non-Zeal/old client the line just reads as a
+		// harmless confirmation.
+		if (ivrs->augments[4] == 0xADDCA) {
+			const uint32 add_spell_id = ivrs->augments[2];
+			const uint16 add_bot_id   = static_cast<uint16>(ivrs->augments[3]);
+			Mob *add_mob = entity_list.GetMob(add_bot_id);
+			Bot *add_bot = (add_mob && add_mob->IsBot()) ? add_mob->CastToBot() : nullptr;
+			if (!add_bot) {
+				Message(Chat::Red, "Couldn't create that bot cast button: the bot is no longer nearby.");
+				return;
+			}
+			if (!IsValidSpell(add_spell_id)) {
+				Message(Chat::Red, "Couldn't create that bot cast button: that spell is invalid.");
+				return;
+			}
+			Message(
+				Chat::Lime,
+				"Bot cast button ready: [%s] %s via %s (id %u)",
+				GetPlayerClassAbbreviation(add_bot->GetClass()).c_str(),
+				spells[add_spell_id].name,
+				add_bot->GetCleanName(),
+				add_spell_id
+			);
+			return;
+		}
+
 		// This new scheme will shuttle the ID in the first augment for non-silent links
 		// and the second augment for silent.
 		std::string response = "";
