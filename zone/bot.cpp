@@ -20,6 +20,7 @@
 #include "theo_regen.h" // Theo-and-Co S38: OOC fast-regen meditate curve
 
 #include "common/data_verification.h"
+#include "common/features.h" // Theo-and-Co S56: SAYLINK_ITEM_ID for the [Add Button] cast-social link
 #include "common/repositories/bot_inventories_repository.h"
 #include "common/repositories/bot_spell_settings_repository.h"
 #include "common/repositories/bot_spells_entries_repository.h" // Theo-and-Co S47: Bot::LoadPet defensive class-check
@@ -9068,10 +9069,26 @@ void Bot::ListBotSpells(uint8 min_level)
 				}
 			}
 
+			// Zeal "[Add Button]" (Theo-and-Co S56): a custom-encoded clickable link
+			// the Theo/Zeal client intercepts CLIENT-SIDE (OP_ItemLinkClick; it never
+			// reaches the server) to auto-create a hotbar social that force-casts THIS
+			// spell via THIS bot. item_id == SAYLINK_ITEM_ID makes the client emit the
+			// click packet; the payload rides the augments (augments[2]=spell id,
+			// augments[3]=bot entity id, augments[4]=Zeal marker 0xADDCA). A non-Zeal
+			// client that clicks it just gets a harmless "say link not found"
+			// (augments[0/1]=0). Decoder + marker live in Zeal-RoF2 bot_cast_button.cpp.
+			EQ::SayLinkEngine z_add_button;
+			z_add_button.SetProxyItemID(SAYLINK_ITEM_ID);
+			z_add_button.SetProxyAugment3ID(s.spellid);  // -> wire augments[2]
+			z_add_button.SetProxyAugment4ID(GetID());    // -> wire augments[3] (bot entity id)
+			z_add_button.SetProxyAugment5ID(0xADDCA);    // -> wire augments[4] (Zeal marker)
+			z_add_button.SetProxyText("Add Button");
+			std::string add_button_link = z_add_button.GenerateLink();
+
 			bot_owner->Message(
 				Chat::White,
 				fmt::format(
-					"Spell {} | Spell: {} (ID: {}) | {} | {} | {}{}",
+					"Spell {} | Spell: {} (ID: {}) | {} | {} | {} | {}{}",
 					spell_number,
 					Saylink::Silent(
 						fmt::format("^spellinfo {}", s.spellid),
@@ -9084,6 +9101,7 @@ void Bot::ListBotSpells(uint8 min_level)
 						fmt::format("^spelldisable {}", s.spellid), "Disable"),
 					Saylink::Silent(
 						fmt::format("^cast spellid {} byname {}", s.spellid, GetCleanName()), "Cast"),
+					add_button_link,
 					cd_text
 				).c_str()
 			);
