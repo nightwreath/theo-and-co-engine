@@ -12416,6 +12416,23 @@ bool Bot::AttemptForcedCastSpell(Mob* tar, uint16 spell_id, bool is_disc) {
 		return false;
 	}
 
+	// Theo-and-Co S57: range gate. CastChecks does NOT verify range, so an
+	// out-of-range forced cast would otherwise pass every check, start, and then
+	// silently fizzle at SpellFinished -- the player sees nothing happen. Report
+	// it like the other positioning failures (LoS below) so they know to move
+	// the bot closer. Self-targeted and PBAE (self-centered) spells are always
+	// in range. Mirrors the AE range test in HasValidAETarget (bot.cpp).
+	if (tar != this && !IsPBAESpell(spell_id)) {
+		float spell_range = GetActSpellRange(spell_id, spells[spell_id].range);
+		if (spell_range > 0.0f && Distance(GetPosition(), tar->GetPosition()) > spell_range) {
+			GetBotOwner()->Message(
+				Chat::Yellow,
+				fmt::format("{} says, 'Ability failed to cast -- [{}] is out of range. Move me closer.'", GetCleanName(), tar->GetCleanName()).c_str()
+			);
+			return false;
+		}
+	}
+
 	if (!HasLoS() && !DoLosChecks(tar)) {
 		GetBotOwner()->Message(
 			Chat::Red,
