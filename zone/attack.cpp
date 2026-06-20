@@ -1636,32 +1636,15 @@ bool Mob::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, bool
 	if (weapon)
 		hate = (weapon->GetItem()->Damage + weapon->GetItem()->ElemDmgAmt);
 
-	if (IsBot()) {
-		// Theo-and-Co Phase 3 Group A: bot weapons are COSMETIC. Melee
-		// damage comes from the level x class x role formula, NOT the
-		// equipped weapon. Gate only on genuine target melee-immunity —
-		// NOT weapon equipability/req-level, so a cosmetic off-class
-		// weapon cannot disable the bot's attack.
-		bool _melee_immune = (!other) || other->GetInvul() ||
-			other->GetSpecialAbility(SpecialAbility::MeleeImmunity);
-		bool _is_ranged = (Hand == EQ::invslot::slotRange);
-		my_hit.base_damage = _melee_immune ? 0 :
-			ComputeBotMeleeDamage(GetClass(), GetLevel(), _is_ranged,
-				static_cast<BotRole>(CastToBot()->GetEffectiveBotRole())); // Theo S32: #bot role-aware
-		// Owner Drill-Master dmg_out is applied GENERICALLY in
-		// Mob::CommonDamage for ALL bot damage (melee + spell + DoT),
-		// mirroring player.lua event_damage_given — NOT scoped here.
-#if defined(THEO_GROUPA_STATMODEL_DIAGNOSE) && THEO_GROUPA_STATMODEL_DIAGNOSE
-		LogInfo(
-			"[Theo GroupA weapon] bot [{}] class [{}] level [{}] hand [{}] => "
-			"base_damage [{}] (weapon cosmetic; melee_immune [{}])",
-			GetCleanName(), GetClass(), GetLevel(), Hand,
-			my_hit.base_damage, _melee_immune
-		);
-#endif
-	} else {
-		my_hit.base_damage = GetWeaponDamage(other, weapon, &hate);
-	}
+	// Theo-and-Co S66: bot melee now uses the REAL equipped weapon (stock
+	// GetWeaponDamage), same path as clients — reverting the S32 cosmetic-weapon
+	// formula (ComputeBotMeleeDamage). Weapons/shields are real and player-
+	// provided; armor/attributes/HP/AC/resists stay formula. GetWeaponDamage
+	// handles target invul/melee-immunity, req-level, and class/race-equipability
+	// (returns 0), so a bare-handed or wrong-class/too-high weapon is handled
+	// correctly. Owner Drill-Master dmg_out is still applied generically in
+	// Mob::CommonDamage for ALL bot damage.
+	my_hit.base_damage = GetWeaponDamage(other, weapon, &hate);
 	if (hate == 0 && my_hit.base_damage > 1)
 		hate = my_hit.base_damage;
 

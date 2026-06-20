@@ -627,6 +627,13 @@ inline int32_t BotComputeHPOffset(uint8_t class_, uint8_t level) {
 }
 
 // =========================================================================
+// RETIRED S66: ComputeBotMeleeDamage / ComputeBotWeaponDelay are NO LONGER
+// CALLED. Bot melee damage + swing delay now come from the REAL equipped
+// weapon (stock GetWeaponDamage + ItemToUse->Delay) — see attack.cpp and
+// Bot::SetAttackTimer. Weapons/shields/bows are real + player-provided; only
+// ARMOR + attributes/HP/AC/resists remain formula-driven. Kept below for
+// reference / possible reuse; do NOT wire them back into the melee path.
+// =========================================================================
 // SYNTHETIC WEAPON (step 3) — equipped weapon is cosmetic; bot melee damage
 // + attack delay come from class weapon-type, mirroring the armor curve.
 // Scheme CONFIRMED (Alex 2026-05-16). Damage = L1 real baseline ramping to
@@ -713,31 +720,13 @@ enum BotCosmeticSlot {
 };
 
 inline uint32_t GetBotCosmeticItemId(uint8_t class_, int bcs) {
-	if (bcs == BCS_Primary) {
-		switch (class_) {
-			case 1:  return 5008;  // WAR Broad Sword
-			case 2:  return 6019;  // CLR Bronze Mace
-			case 3:  return 5002;  // PAL Long Sword
-			case 4:  return 6902;  // RNG Bronze Wakizashi
-			case 5:  return 5004;  // SK  Bastard Sword
-			case 6:  return 5034;  // DRU Bronze Scimitar
-			case 8:  return 6906;  // BRD Bronze Tachi
-			case 9:  return 7012;  // ROG Bronze Dagger
-			case 10: return 7014;  // SHM Bronze Spear
-			case 11: return 5010;  // NEC Scythe
-			case 12: case 13: case 14: return 6012; // WIZ/MAG/ENC Worn Great Staff
-			default: return 0;     // MNK/BST bare-handed
-		}
-	}
-	if (bcs == BCS_Secondary) {
-		switch (class_) {
-			case 1: case 3: case 5: return 9006;  // WAR/PAL/SK Wooden Shield
-			case 2: case 6:         return 13991; // CLR/DRU Testament of Vanear
-			default:                return 0;
-		}
-	}
-	if (bcs == BCS_Range) {
-		return (class_ == 4) ? 8009 : 0;          // RNG Short Bow
+	// Theo-and-Co S66: weapons, shields, and bows are PLAYER-PROVIDED and REAL.
+	// No cosmetic auto-equip for the hand slots — bots come unarmed and the
+	// player hands them real gear, which then drives melee for real (see
+	// attack.cpp GetWeaponDamage + Bot::SetAttackTimer + Bot::CalcBonuses S66).
+	// (Retired the cosmetic Primary weapon / Secondary shield / Range bow table.)
+	if (bcs == BCS_Primary || bcs == BCS_Secondary || bcs == BCS_Range) {
+		return 0;
 	}
 	// caster robe: chest only, no other armor (robe model covers the body)
 	if (class_ == 11 || class_ == 12 || class_ == 13 || class_ == 14) {
@@ -752,7 +741,13 @@ inline uint32_t GetBotCosmeticItemId(uint8_t class_, int bcs) {
 		return 0;
 	}
 	// armor set {head,chest,arms,wrist,hands,legs,feet}
-	static const uint32_t kOrnate[7]  = {9589,14955,25332,11072,12099,16615,19081}; // WAR PAL
+	// {head,chest,arms,wrist,hands,legs,feet}. S66: 5 of the original picks
+	// (9589/14955/11072/12099/16615 = classes 33544 = RNG/ROG/SHM/BER only) were
+	// legal for NEITHER WAR nor PAL, so the EquipBot class-check guard discarded
+	// them and the fill re-added them EVERY spawn (the warrior/paladin gear
+	// churn). Swapped to the WAR+PAL-legal mat-21 "Sentry" plate set (classes
+	// 33695); arms 25332 + feet 19081 were already WAR+PAL-legal, kept.
+	static const uint32_t kOrnate[7]  = {29090,29088,25332,29092,29093,29089,19081}; // WAR PAL (mat 21, classes 33695)
 	static const uint32_t kBronze[7]  = {4201, 4204, 4208, 4209, 4210, 4211, 4212};  // SK  BRD
 	static const uint32_t kSeb[7]     = {3200, 3203, 3207, 3208, 3209, 3210, 3211};  // CLR
 	static const uint32_t kChain[7]   = {7409, 7412, 7416, 7417, 7418, 7419, 7420};  // RNG ROG SHM
