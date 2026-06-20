@@ -5888,11 +5888,12 @@ void Bot::EquipBot() {
 	// like player-given gear. Player gear in a slot always wins; once granted
 	// it persists, so subsequent spawns skip it (only re-grants if a slot is
 	// emptied). Phase A CalcBonuses zeroes item stats, so this is 100% visual.
-	// Theo-and-Co S66: ARMOR slots only. Weapons/shields/bows are no longer
-	// auto-equipped — they are player-provided and real (BCS_Primary/Secondary/
-	// Range now return 0 anyway). The armor fill is idempotent (skips occupied
-	// slots + persists), so it effectively applies the class cosmetic set ONCE
-	// at creation and never re-gears on later spawns.
+	// Theo-and-Co S66: fill-if-empty starter set. ARMOR slots = cosmetic
+	// (visual); HAND slots = REAL Skip "Rusty" starter weapons (a working floor;
+	// the player upgrades). Idempotent — skips any slot the player already filled
+	// and persists, so it grants once per bot (first/next spawn) and never
+	// re-gears or overwrites. Class-legal picks, so the discard guard above never
+	// touches them.
 	static const struct { int16 inv; int bcs; } kCosmeticSlots[] = {
 		{ EQ::invslot::slotHead,      BCS_Head },
 		{ EQ::invslot::slotChest,     BCS_Chest },
@@ -5902,10 +5903,21 @@ void Bot::EquipBot() {
 		{ EQ::invslot::slotHands,     BCS_Hands },
 		{ EQ::invslot::slotLegs,      BCS_Legs },
 		{ EQ::invslot::slotFeet,      BCS_Feet },
+		{ EQ::invslot::slotPrimary,   BCS_Primary },
+		{ EQ::invslot::slotSecondary, BCS_Secondary },
+		{ EQ::invslot::slotRange,     BCS_Range },
 	};
 	for (const auto& cs : kCosmeticSlots) {
 		if (GetBotItem(cs.inv)) {
 			continue; // real / player-given gear in this slot wins
+		}
+		// Don't auto-equip an off-hand shield alongside a 2H primary (the player
+		// may have given the bot a two-hander) — avoids the 2H+shield combo.
+		if (cs.inv == EQ::invslot::slotSecondary) {
+			const EQ::ItemInstance* prim = GetBotItem(EQ::invslot::slotPrimary);
+			if (prim && prim->GetItem() && prim->GetItem()->IsType2HWeapon()) {
+				continue;
+			}
 		}
 		uint32 cosmetic_id = GetBotCosmeticItemId(GetClass(), cs.bcs);
 		if (!cosmetic_id) {
