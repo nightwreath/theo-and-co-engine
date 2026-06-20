@@ -5829,6 +5829,15 @@ bool Bot::IsBotAttackAllowed(Mob* attacker, Mob* target, bool& hasRuleDefined) {
 void Bot::EquipBot() {
 	GetBotItems(m_inv);
 
+	// Theo S66: cache the owner's bot-stat-model choice once per spawn (Kalgrim's
+	// "bot_stock_stats" toggle on the owner). "1" => stock model (base + all gear
+	// + buffs); unset/else => Theo formula model (DEFAULT). Cached so the hot
+	// CalcBonuses / CalcMaxHP read a member, not a DB-backed GetBucket.
+	{
+		auto bot_owner = GetBotOwner();
+		m_use_stock_stat_model = (bot_owner && bot_owner->GetBucket("bot_stock_stats") == "1");
+	}
+
 	// Defensive class-check: discard any equipped item the bot's class
 	// cannot use (per `items.classes` bitmask). Cross-class gear lands in
 	// bot_inventories the same way cross-class pets land in bot_pets --
@@ -5907,23 +5916,42 @@ void Bot::EquipBot() {
 		{ EQ::invslot::slotSecondary, BCS_Secondary },
 		{ EQ::invslot::slotRange,     BCS_Range },
 	};
-	for (const auto& cs : kCosmeticSlots) {
-		if (GetBotItem(cs.inv)) {
-			continue; // real / player-given gear in this slot wins
-		}
-		// Don't auto-equip an off-hand shield alongside a 2H primary (the player
-		// may have given the bot a two-hander) — avoids the 2H+shield combo.
-		if (cs.inv == EQ::invslot::slotSecondary) {
-			const EQ::ItemInstance* prim = GetBotItem(EQ::invslot::slotPrimary);
-			if (prim && prim->GetItem() && prim->GetItem()->IsType2HWeapon()) {
+	if (!m_use_stock_stat_model) {
+		// THEO model (default): fill-if-empty with the cosmetic-armor + Skip
+		// starter-weapon set.
+		for (const auto& cs : kCosmeticSlots) {
+			if (GetBotItem(cs.inv)) {
+				continue; // real / player-given gear in this slot wins
+			}
+			// Don't auto-equip an off-hand shield alongside a 2H primary (the player
+			// may have given the bot a two-hander) — avoids the 2H+shield combo.
+			if (cs.inv == EQ::invslot::slotSecondary) {
+				const EQ::ItemInstance* prim = GetBotItem(EQ::invslot::slotPrimary);
+				if (prim && prim->GetItem() && prim->GetItem()->IsType2HWeapon()) {
+					continue;
+				}
+			}
+			uint32 cosmetic_id = GetBotCosmeticItemId(GetClass(), cs.bcs);
+			if (!cosmetic_id) {
 				continue;
 			}
+			AddBotItem(cs.inv, cosmetic_id);
 		}
-		uint32 cosmetic_id = GetBotCosmeticItemId(GetClass(), cs.bcs);
-		if (!cosmetic_id) {
-			continue;
+	} else {
+		// STOCK model (Kalgrim toggle off): no auto-fill, and STRIP any gear WE
+		// auto-filled so the bot keeps only what the player gave it. We strip a
+		// slot only when its item is exactly the item we'd auto-fill there
+		// (cosmetic armor / Skip starter weapon / shield / bow), so player-given
+		// gear (any other id) is left untouched.
+		for (const auto& cs : kCosmeticSlots) {
+			const EQ::ItemInstance* it = GetBotItem(cs.inv);
+			if (!it || !it->GetItem()) {
+				continue;
+			}
+			if (it->GetItem()->ID == GetBotCosmeticItemId(GetClass(), cs.bcs)) {
+				RemoveBotItemBySlot(cs.inv);
+			}
 		}
-		AddBotItem(cs.inv, cosmetic_id);
 	}
 
 	const EQ::ItemInstance* inst = nullptr;
@@ -6570,6 +6598,11 @@ bool Bot::DoFinishedSpellGroupTarget(uint16 spell_id, Mob* spellTarget, EQ::spel
 void Bot::CalcBonuses() {
 	memset(&itembonuses, 0, sizeof(StatBonuses));
 	GenerateBaseStats();
+	// Theo S66: the bot stat MODEL is toggleable per-player via Kalgrim
+	// ("bot_stock_stats", cached in EquipBot as m_use_stock_stat_model). DEFAULT
+	// (false) = the Theo formula model in this if-block. STOCK (true) = vanilla
+	// bot (base stats + ALL gear/buffs) in the else-block below. AA unchanged.
+	if (!m_use_stock_stat_model) {
 	// === Theo-and-Co Phase 3 Group A: equipped gear is COSMETIC ===========
 	// Do NOT skip CalcItemBonuses/CalcHeroicBonuses outright: they carry
 	// load-bearing SIDE EFFECTS the engine assumes run every CalcBonuses
@@ -6648,6 +6681,16 @@ void Bot::CalcBonuses() {
 	// CalcItemBonuses/CalcHeroicBonuses ARE called above (into scratch) for
 	// their side effects; only the ARMOR stat contribution is discarded.
 	// ======================================================================
+	} else {
+		// STOCK model (Kalgrim toggle off): vanilla bot. Base level-1 stats
+		// (GenerateBaseStats above) + ALL equipped gear (armor + weapon + shield)
+		// + buffs drive everything — CalcItemBonuses runs into the REAL itembonuses
+		// (not a scratch). No formula, no synthetic resists, no HP offset. The
+		// item-bonus side effects (shield/2H flags, etc.) run here for real. AA is
+		// still earned/Kalgrim-gated (unchanged). Weapon dmg/delay already real.
+		CalcItemBonuses(&itembonuses);
+		CalcHeroicBonuses(&itembonuses);
+	}
 	CalcSpellBonuses(&spellbonuses);
 	CalcAABonuses(&aabonuses);
 	SetAttackTimer();
@@ -7196,7 +7239,9 @@ int64 Bot::CalcMaxHP() {
 	// L60+. Offset is flat HP added here (AFTER the AA-percent multiplier);
 	// 0 below L51 (no AAs granted, no asymmetry). Per-class audit-anchored
 	// table + level-shape function live in bot_stat_model.h.
-	const int32 hp_calibration = BotComputeHPOffset(GetClass(), GetLevel());
+	// Theo S66: the calibration offset is part of the Theo formula model only.
+	// In stock mode HP comes from base stats + gear, so no offset.
+	const int32 hp_calibration = m_use_stock_stat_model ? 0 : BotComputeHPOffset(GetClass(), GetLevel());
 	bot_hp += hp_calibration;
 #if THEO_GROUPA_HP_CALIBRATION_DIAGNOSE
 	LogInfo("[Theo HP Calibration] bot=[{}] L{} class={} offset={} pre-leadership_hp={}",

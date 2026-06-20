@@ -1255,6 +1255,13 @@ private:
 	Timer m_combat_jitter_timer;
 
 	bool m_dirtyautohaters;
+	// Theo S66: cached per-spawn "stock stat model" choice (Kalgrim toggle). true =>
+	// stock bot (base level-1 stats + ALL gear/buffs; no formula, cosmetic-armor,
+	// synthetic-resists or HP-offset; auto-fill gear stripped). false => Theo
+	// formula model (DEFAULT). Read once from the owner's "bot_stock_stats" bucket
+	// in EquipBot to keep the hot CalcBonuses path off a DB-backed GetBucket. AA is
+	// unchanged in both modes.
+	bool m_use_stock_stat_model = false;
 	bool m_guard_flag;
 	bool m_hold_flag;
 	bool m_attack_flag;
