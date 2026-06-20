@@ -5556,10 +5556,10 @@ void Bot::DoClassAttacks(Mob *target, bool IsRiposte) {
 					GetBaseRace() == Race::Barbarian
 					);
 				bool has_bash_skill = GetSkill(EQ::skills::SkillBash) > 0;
-				// Theo Group A: tank bots' shield is cosmetic (no real item);
-				// HasShieldEquipped() is forced true for tank role in
-				// CalcBonuses, so the bot AI elects Bash correctly. (Still
-				// true for any bot with a real shield via the same flag.)
+				// Theo S66: shields are REAL + player-provided. HasShieldEquipped()
+				// now reflects an actual shield in the secondary (the old role-based
+				// force-true was removed in CalcBonuses), so a tank elects Bash only
+				// when it really has a shield (or a 2H+AA, or is a large race).
 				bool has_shield_in_secondary = HasShieldEquipped();
 				bool has_two_hander_with_aa =
 					m_inv.GetItem(EQ::invslot::slotPrimary) &&
@@ -5888,6 +5888,11 @@ void Bot::EquipBot() {
 	// like player-given gear. Player gear in a slot always wins; once granted
 	// it persists, so subsequent spawns skip it (only re-grants if a slot is
 	// emptied). Phase A CalcBonuses zeroes item stats, so this is 100% visual.
+	// Theo-and-Co S66: ARMOR slots only. Weapons/shields/bows are no longer
+	// auto-equipped — they are player-provided and real (BCS_Primary/Secondary/
+	// Range now return 0 anyway). The armor fill is idempotent (skips occupied
+	// slots + persists), so it effectively applies the class cosmetic set ONCE
+	// at creation and never re-gears on later spawns.
 	static const struct { int16 inv; int bcs; } kCosmeticSlots[] = {
 		{ EQ::invslot::slotHead,      BCS_Head },
 		{ EQ::invslot::slotChest,     BCS_Chest },
@@ -5897,9 +5902,6 @@ void Bot::EquipBot() {
 		{ EQ::invslot::slotHands,     BCS_Hands },
 		{ EQ::invslot::slotLegs,      BCS_Legs },
 		{ EQ::invslot::slotFeet,      BCS_Feet },
-		{ EQ::invslot::slotPrimary,   BCS_Primary },
-		{ EQ::invslot::slotSecondary, BCS_Secondary },
-		{ EQ::invslot::slotRange,     BCS_Range },
 	};
 	for (const auto& cs : kCosmeticSlots) {
 		if (GetBotItem(cs.inv)) {
@@ -6017,12 +6019,13 @@ void Bot::SetAttackTimer() {
 		int hhe = (itembonuses.HundredHands + spellbonuses.HundredHands);
 		int speed = 0;
 		int delay = 36;
-		// Theo-and-Co Phase 3 Group A: bot weapons are COSMETIC. Attack
-		// delay comes from the class weapon-type formula, not the equipped
-		// item's Delay. (Dual-wield / 2H structural gating above unchanged.)
-		{
-			bool _is_ranged = (i == EQ::invslot::slotRange);
-			delay = ComputeBotWeaponDelay(GetClass(), _is_ranged);
+		// Theo-and-Co S66: bot attack delay now comes from the REAL equipped
+		// weapon's Delay (stock), reverting the S32 cosmetic-weapon formula
+		// (ComputeBotWeaponDelay). 36 = bare-handed default; ItemToUse is the
+		// validated equipped weapon (nullptr above if not a usable weapon). The
+		// dual-wield / 2H structural gating above is unchanged.
+		if (ItemToUse != nullptr) {
+			delay = ItemToUse->Delay;
 		}
 
 		speed = (RuleB(Spells, Jun182014HundredHandsRevamp) ? static_cast<int>(((delay / haste_mod) + ((hhe / 1000.0f) * (delay / haste_mod))) * 100) : static_cast<int>(((delay / haste_mod) + ((hhe / 100.0f) * delay)) * 100));
@@ -6605,19 +6608,33 @@ void Bot::CalcBonuses() {
 		);
 #endif
 	}
-	// Theo-and-Co Phase 3 Group A: tank-role bots are treated as
-	// shield-equipped. Their shield is COSMETIC (no real item), so set the
-	// cached has_shield_equipped flag here — every HasShieldEquipped() gate
-	// (Bash, ShieldBlock, weapon-stance, shield AC) then works for tanks.
-	// Role-keyed so stance work (B/C) can later modulate (defensive vs 2H).
-	// Non-tank bots unchanged. (Shield-block PROC still also needs a
-	// ShieldBlock bonus bots lack w/o AA — bounded by the deferred AA work,
-	// not this fix; Bash, the main active tank shield ability, works.)
-	if (static_cast<BotRole>(GetEffectiveBotRole()) == BotRole::Tank) {
-		SetShieldEquipped(true);
+	// Theo-and-Co S66: main-hand + off-hand + ranged (+ammo) slots are REAL.
+	// Add ONLY those slots' item bonuses on top of the formula itembonuses —
+	// shield AC, weapon STR/haste/proc-chance, bow stats. The 7 armor slots are
+	// NOT re-added (their bonuses went into the discarded scratch above), so
+	// armor stays 100% cosmetic. This is what makes a player-given weapon/shield
+	// actually matter while keeping attributes/HP/AC/resists formula-based.
+	static const int16 kRealHandSlots[] = {
+		EQ::invslot::slotPrimary,
+		EQ::invslot::slotSecondary,
+		EQ::invslot::slotRange,
+		EQ::invslot::slotAmmo,
+	};
+	for (int16 _real_slot : kRealHandSlots) {
+		const EQ::ItemInstance* _ri = GetBotItem(_real_slot);
+		if (_ri) {
+			AddItemBonuses(_ri, &itembonuses);
+		}
 	}
+	// Shield-equipped / 2H / dual-wield flags are set from the REAL equipped
+	// items by CalcItemBonuses (run into scratch above for its side effects —
+	// SetShieldEquipped lives on the Mob, not the discarded bonus struct). So a
+	// real shield in the secondary drives HasShieldEquipped() (Bash, weapon-
+	// stance, shield-AC); a tank holding a 2H is correctly NOT shield-equipped.
+	// (S66: removed the old role-based SetShieldEquipped(true) fake.) Shield-
+	// block % still needs the ShieldBlock AA bots lack — deferred AA work.
 	// CalcItemBonuses/CalcHeroicBonuses ARE called above (into scratch) for
-	// their side effects; only the gear STAT contribution is discarded.
+	// their side effects; only the ARMOR stat contribution is discarded.
 	// ======================================================================
 	CalcSpellBonuses(&spellbonuses);
 	CalcAABonuses(&aabonuses);
