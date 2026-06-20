@@ -698,12 +698,17 @@ inline int ComputeBotWeaponDelay(uint8_t class_, bool is_ranged) {
 }
 
 // =========================================================================
-// COSMETIC STARTER GEAR (real items, LOCKED Alex 2026-05-17). Bots equip a
-// class set of REAL items, injected in-memory into empty slots only by
-// Bot::EquipBot (NOT persisted; player-given gear always wins). Phase A
-// CalcBonuses zeroes item stats, so this is 100% visual; the native
-// equip/WearChange path renders it correctly on Luclin models (the prior
-// per-slot spawn-struct Material poke fought that path and broke it).
+// STARTER GEAR (LOCKED Alex 2026-05-17; S66 split into cosmetic armor + real
+// weapons). Bot::EquipBot fills these REAL items into EMPTY equip slots only
+// (persisted via AddBotItem; player-given gear always wins; granted once then
+// the player upgrades). TWO kinds now:
+//   * ARMOR (7 slots): COSMETIC — CalcBonuses discards armor item stats, so it
+//     is 100% visual (class-appropriate Luclin look via the item's material).
+//   * HANDS (primary/secondary/range): REAL starter weapons from Skip's "Rusty"
+//     line (S66) — they DRIVE melee (GetWeaponDamage) + shield AC. A working
+//     floor; the player upgrades. The off-hand shield fill skips a 2H primary.
+// The native equip/WearChange path renders armor correctly on Luclin models
+// (the prior per-slot spawn-struct Material poke fought that path and broke it).
 // All IDs DB-verified. Berserker omitted (disabled class — no Berserkers).
 //
 //   Armor groups (Luclin: appearance = the item's material value):
@@ -720,13 +725,32 @@ enum BotCosmeticSlot {
 };
 
 inline uint32_t GetBotCosmeticItemId(uint8_t class_, int bcs) {
-	// Theo-and-Co S66: weapons, shields, and bows are PLAYER-PROVIDED and REAL.
-	// No cosmetic auto-equip for the hand slots — bots come unarmed and the
-	// player hands them real gear, which then drives melee for real (see
-	// attack.cpp GetWeaponDamage + Bot::SetAttackTimer + Bot::CalcBonuses S66).
-	// (Retired the cosmetic Primary weapon / Secondary shield / Range bow table.)
-	if (bcs == BCS_Primary || bcs == BCS_Secondary || bcs == BCS_Range) {
-		return 0;
+	// Theo-and-Co S66: ONE-TIME STARTER weapon set from Skip's "Rusty" line
+	// (merchant 99020). These are REAL items now (drive melee via GetWeaponDamage)
+	// — NOT cosmetic. EquipBot fills them only into EMPTY hand slots and never
+	// overwrites player gear, so each bot gets a working weapon floor once and
+	// the player upgrades from there. All picks are class-legal (the guard never
+	// discards them). Dual-wield off-hands / upgrades are the player's job.
+	if (bcs == BCS_Primary) {
+		switch (class_) {
+			case 1: case 3: case 5: case 4: case 8: return 5019;  // WAR/PAL/SK/RNG/BRD Rusty Long Sword (1H slash)
+			case 2: case 10:                        return 6014;  // CLR/SHM Rusty Warhammer (1H blunt)
+			case 6:                                 return 5021;  // DRU Rusty Scimitar (1H slash, druid-legal)
+			case 7: case 15:                        return 26800; // MNK/BST Rusty Ulak (hand-to-hand)
+			case 9: case 11: case 12: case 13: case 14: return 7007; // ROG/NEC/WIZ/MAG/ENC Rusty Dagger (1H pierce)
+			default: return 0;
+		}
+	}
+	if (bcs == BCS_Secondary) {
+		// Round Shield (class-legal 17343) for tanks + melee-healers. EquipBot
+		// SKIPS this when the primary is a 2H weapon — no 2H+shield combo.
+		switch (class_) {
+			case 1: case 2: case 3: case 5: case 6: case 10: return 9002; // WAR/CLR/PAL/SK/DRU/SHM
+			default: return 0;
+		}
+	}
+	if (bcs == BCS_Range) {
+		return (class_ == 4) ? 8009 : 0; // RNG Short Bow
 	}
 	// caster robe: chest only, no other armor (robe model covers the body)
 	if (class_ == 11 || class_ == 12 || class_ == 13 || class_ == 14) {
