@@ -6463,7 +6463,12 @@ bool Bot::DoFinishedSpellSingleTarget(uint16 spell_id, Mob* spellTarget, EQ::spe
 			bool spelltypeequal = (
 				(spelltype == BotSpellTypes::RegularHeal) ||
 				(spelltype == BotSpellTypes::Escape) ||
-				(spelltype == BotSpellTypes::Pet)
+				(spelltype == BotSpellTypes::Pet) ||
+				// Theo-and-Co: single Cures are single-target (cure the afflicted
+				// member only, cost x1) -- not group-sprayed like a buff onto every
+				// member. GroupCures (a real group spell) stays group-applied.
+				(spelltype == BotSpellTypes::Cure) ||
+				(spelltype == BotSpellTypes::PetCures)
 			);
 			bool spelltypetargetequal = (
 				(spelltype == BotSpellTypes::Buff) &&
@@ -6537,9 +6542,14 @@ bool Bot::DoFinishedSpellSingleTarget(uint16 spell_id, Mob* spellTarget, EQ::spe
 				) {
 					SpellOnTarget(thespell, m->GetPet());
 				}
-
-				SetMana(GetMana() - (GetActSpellCost(thespell, spells[thespell].mana) * (GetBuffTargets(spellTarget).size() - 1)));
 			}
+
+			// Theo-and-Co fix (upstream Bot Overhaul #4580): this mana deduction
+			// sat INSIDE the per-target loop, charging cost*(N-1) once PER target
+			// = cost*N*(N-1) total -- draining a bot's whole mana pool on any
+			// group buff/cure (group of 6, Celerity@185 = 5550). Charge the extra
+			// (N-1) targets ONCE, after the loop.
+			SetMana(GetMana() - (GetActSpellCost(thespell, spells[thespell].mana) * (GetBuffTargets(spellTarget).size() - 1)));
 		}
 
 		stopLogic = true;
