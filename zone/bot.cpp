@@ -1326,6 +1326,14 @@ void Bot::LoadAAs() {
 	// (CanUseAlternateAdvancementRank) is deliberately unchanged.
 	const int eff_aa_level = GetEarnedAALevel();
 
+	// Theo S69 — bot-AA diagnostic instrumentation (Alex: a permanent way to
+	// see why a bot's AA total is what it is, for this and future AA issues).
+	// Every non-expendable ability is attributed to granted vs skipped, and
+	// skips are split into "first rank over the earned-AA level" vs the
+	// class/expansion/race/deity gate (CanUseAlternateAdvancementRank). One
+	// line per LoadAAs pass, under Logs::BotSettings.
+	int dbg_total = 0, dbg_granted = 0, dbg_rej_level = 0, dbg_rej_gate = 0;
+
 	int id = 0;
 	int points = 0;
 	auto iter = zone->aa_abilities.begin();
@@ -1338,18 +1346,27 @@ void Bot::LoadAAs() {
 			continue;
 		}
 
+		++dbg_total;
+
 		id = ability->first->id;
 		points = 0;
 
 		AA::Rank *current = ability->first;
 
 		if (current->level_req > eff_aa_level) {
+			++dbg_rej_level;
 			++iter;
 			continue;
 		}
 
 		while(current) {
 			if (current->level_req > eff_aa_level || !CanUseAlternateAdvancementRank(current)) {
+				// attribute a zero-grant stop to the gate (rank 1 passed the
+				// level pre-check above, so a points==0 stop here is the
+				// class/expansion/race/deity gate, not level)
+				if (points == 0 && current->level_req <= eff_aa_level) {
+					++dbg_rej_gate;
+				}
 				current = nullptr;
 			} else {
 				current = current->next;
@@ -1359,10 +1376,20 @@ void Bot::LoadAAs() {
 
 		if (points > 0) {
 			SetAA(id, points);
+			++dbg_granted;
 		}
 
 		++iter;
 	}
+
+	LogBotSettings(
+		"[BotAA] LoadAAs bot [{}] class [{}] level [{}] eff_aa_level [{}] "
+		"abilities_total [{}] granted [{}] skipped_over_level [{}] "
+		"skipped_gate [{}] total_aa_points [{}]",
+		GetCleanName(), GetClass(), GetLevel(), eff_aa_level,
+		dbg_total, dbg_granted, dbg_rej_level, dbg_rej_gate,
+		ComputeTotalAAPoints()
+	);
 }
 
 bool Bot::IsValidRaceClassCombo()
@@ -3766,7 +3793,18 @@ bool Bot::Spawn(Client* botCharacterOwner) {
 		// initializer (zero AA — the safe default). If the owner has earned
 		// progress, this flips the cache and re-derives the bot now so its AA
 		// is correct at spawn, not only after the first 6s tic.
-		if (RefreshOwnerEarnedAA()) {
+		// S69 diagnostic: log the spawn-time refresh result per bot so we can
+		// see whether the owner bucket was read and the re-derive actually
+		// fired (the LoadAAs line then shows what that re-derive granted).
+		const bool aa_refreshed = RefreshOwnerEarnedAA();
+		LogBotSettings(
+			"[BotAA] spawn bot [{}] class [{}] level [{}] owner [{}] "
+			"earned_aa_level [{}] refreshed [{}]",
+			GetCleanName(), GetClass(), GetLevel(),
+			(GetBotOwner() ? GetBotOwner()->GetCleanName() : "NONE"),
+			m_earned_aa_level, aa_refreshed
+		);
+		if (aa_refreshed) {
 			CalcBotStats(false);
 		}
 		LoadBotSpellSettings();
